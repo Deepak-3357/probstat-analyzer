@@ -1,6 +1,3 @@
-
-
-````markdown
 # ProbStat Analyzer
 
 ## A Web-Based Probability Distribution Analysis and Statistical Modeling System
