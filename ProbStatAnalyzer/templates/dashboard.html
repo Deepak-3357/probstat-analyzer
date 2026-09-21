@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard | ProbStat Analyzer</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</head>
+<body>
+  {% include 'navbar.html' %}
+  <main class="dashboard-shell">
+    <aside class="sidebar">
+      <a href="#dataset"><i class="bi bi-table"></i> Dataset</a>
+      <a href="#stats"><i class="bi bi-clipboard-data"></i> Statistics</a>
+      <a href="#distribution"><i class="bi bi-diagram-2"></i> Distribution</a>
+      <a href="#probability"><i class="bi bi-percent"></i> Probability</a>
+      <a href="#visuals"><i class="bi bi-activity"></i> Visualizations</a>
+      <a href="#report"><i class="bi bi-file-earmark-pdf"></i> Report</a>
+    </aside>
+    <section class="dashboard-content">
+      {% include 'partials_flash.html' ignore missing %}
+      <div class="d-flex flex-wrap justify-content-between gap-3 align-items-center mb-4">
+        <div>
+          <p class="eyebrow text-primary mb-1">Dashboard</p>
+          <h1 class="mb-0">{{ dataset.original_name }}</h1>
+        </div>
+        <a class="btn btn-outline-primary" href="{{ url_for('upload') }}"><i class="bi bi-plus-circle"></i> New Upload</a>
+      </div>
+
+      <section id="dataset" class="content-band">
+        <div class="row g-3 mb-4">
+          <div class="col-md-3"><div class="stat-card"><span>Rows</span><strong>{{ dataset.profile.rows }}</strong></div></div>
+          <div class="col-md-3"><div class="stat-card"><span>Columns</span><strong>{{ dataset.profile.columns }}</strong></div></div>
+          <div class="col-md-3"><div class="stat-card"><span>Numeric</span><strong>{{ dataset.numeric_columns|length }}</strong></div></div>
+          <div class="col-md-3"><div class="stat-card"><span>Uploaded</span><strong>{{ dataset.uploaded_at }}</strong></div></div>
+        </div>
+        <div class="tool-panel">
+          <div class="row g-4">
+            <div class="col-lg-5">
+              <h2 class="h4">Select Numerical Column</h2>
+              <form action="{{ url_for('analyze') }}" method="post">
+                <select class="form-select form-select-lg mb-3" name="column" required {% if not dataset.numeric_columns %}disabled{% endif %}>
+                  {% for column in dataset.numeric_columns %}
+                    <option value="{{ column }}" {% if analysis and analysis.column == column %}selected{% endif %}>{{ column }}</option>
+                  {% endfor %}
+                </select>
+                <button class="btn btn-primary w-100" type="submit" {% if not dataset.numeric_columns %}disabled{% endif %}>
+                  <i class="bi bi-play-circle"></i> Run Complete Analysis
+                </button>
+              </form>
+              {% if not dataset.numeric_columns %}
+                <div class="alert alert-warning mt-3">No numeric column exists in this dataset.</div>
+              {% endif %}
+              <hr>
+              <h3 class="h6">Recent uploads</h3>
+              <ul class="small text-secondary mb-0">
+                {% for name in recent_uploads %}<li>{{ name }}</li>{% else %}<li>No recent uploads.</li>{% endfor %}
+              </ul>
+            </div>
+            <div class="col-lg-7">
+              <input class="form-control mb-3" id="datasetSearch" type="search" placeholder="Search preview rows">
+              <div class="table-responsive dataset-preview">{{ preview|safe }}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {% if analysis %}
+      <section id="stats" class="content-band">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+          <div>
+            <p class="eyebrow text-primary mb-1">Educational Summary</p>
+            <h2 class="mb-0">Descriptive Statistics</h2>
+          </div>
+          <span class="badge text-bg-primary">Basic visible · Advanced accordion</span>
+        </div>
+
+        <h3 class="h5 mb-3">Basic Statistics</h3>
+        <div class="row g-3 stats-grid">
+          {% for item in analysis.statistic_cards.basic %}
+          <div class="col-sm-6 col-lg-3">
+            <div class="stat-card stat-info-card compact">
+              <div class="d-flex justify-content-between gap-2 align-items-start">
+                <i class="bi {{ item.icon }} stat-icon"></i>
+                <button class="btn btn-sm btn-outline-secondary icon-btn stat-info-btn" type="button"
+                        data-bs-toggle="tooltip" data-bs-html="true"
+                        data-bs-title="<strong>Definition</strong><br>{{ item.definition }}<br><br><strong>Formula</strong><br>{{ item.formula }}<br><br><strong>Why useful</strong><br>{{ item.usefulness }}">
+                  <i class="bi bi-info-circle"></i>
+                </button>
+              </div>
+              <span>{{ item.name }}</span>
+              <strong>{{ item.value }}</strong>
+              <p class="full-form mb-1">{{ item.full_form }}</p>
+              <div class="formula-mini">\({{ item.formula }}\)</div>
+              <p class="small text-secondary mb-0">{{ item.interpretation }}</p>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="accordion explanation-accordion mt-4" id="advancedStatsAccordion">
+          <div class="accordion-item">
+            <h3 class="accordion-header">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advancedStats">
+                <i class="bi bi-bar-chart-steps"></i> Advanced Statistics
+              </button>
+            </h3>
+            <div id="advancedStats" class="accordion-collapse collapse" data-bs-parent="#advancedStatsAccordion">
+              <div class="accordion-body">
+                <div class="row g-3 stats-grid">
+                  {% for item in analysis.statistic_cards.advanced %}
+                  <div class="col-sm-6 col-lg-4">
+                    <div class="stat-card stat-info-card compact">
+                      <div class="d-flex justify-content-between gap-2 align-items-start">
+                        <i class="bi {{ item.icon }} stat-icon"></i>
+                        <button class="btn btn-sm btn-outline-secondary icon-btn stat-info-btn" type="button"
+                                data-bs-toggle="tooltip" data-bs-html="true"
+                                data-bs-title="<strong>Definition</strong><br>{{ item.definition }}<br><br><strong>Formula</strong><br>{{ item.formula }}<br><br><strong>Why useful</strong><br>{{ item.usefulness }}">
+                          <i class="bi bi-info-circle"></i>
+                        </button>
+                      </div>
+                      <span>{{ item.name }}</span>
+                      <strong>{{ item.value }}</strong>
+                      <p class="full-form mb-1">{{ item.full_form }}</p>
+                      <div class="formula-mini">\({{ item.formula }}\)</div>
+                      <p class="small text-secondary mb-0">{{ item.interpretation }}</p>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="distribution" class="content-band">
+        <div class="tool-panel">
+          <div class="row g-4">
+            <div class="col-lg-5">
+              <h2>{{ analysis.distribution.best.display_name }}</h2>
+              <p class="lead">{{ analysis.distribution.reason }}</p>
+              <div class="confidence"><span style="width: {{ analysis.distribution.best.confidence_score }}%"></span></div>
+              <p class="small text-secondary mt-2">Confidence score: {{ analysis.distribution.best.confidence_score }}%</p>
+              <h3 class="h5 mt-4">Cleaning Summary</h3>
+              <ul class="clean-list">
+                {% for key, value in analysis.cleaning.items() %}
+                  <li><span>{{ key.replace('_',' ').title() }}</span><strong>{{ value }}</strong></li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div class="col-lg-7">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                  <thead><tr><th>Distribution</th><th>Type</th><th>Status</th><th>Reason</th><th>KS</th><th>AIC</th><th>BIC</th><th>Rank</th><th>Selected</th></tr></thead>
+                  <tbody>
+                  {% for item in analysis.distribution.candidates %}
+                    <tr class="{% if item.selected %}table-primary selected-row{% endif %}">
+                      <td>{{ item.display_name }}</td>
+                      <td><span class="badge {% if item.type == 'Discrete Distribution' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ item.type.replace(' Distribution','') }}</span></td>
+                      <td>
+                        {% if item.selected %}
+                          <span class="badge text-bg-primary"><i class="bi bi-check-circle"></i> Selected</span>
+                        {% elif item.status == 'Successfully Fitted' %}
+                          <span class="badge text-bg-success"><i class="bi bi-check2"></i> Successfully Fitted</span>
+                        {% else %}
+                          <span class="badge text-bg-warning"><i class="bi bi-exclamation-triangle"></i> Not Suitable</span>
+                        {% endif %}
+                      </td>
+                      <td class="small">{{ item.reason }}</td>
+                      <td>{% if item.status == 'Not Suitable' %}-{% else %}{{ '%.5f'|format(item.ks_statistic) }}{% endif %}</td>
+                      <td>{% if item.status == 'Not Suitable' %}-{% else %}{{ '%.2f'|format(item.aic) }}{% endif %}</td>
+                      <td>{% if item.status == 'Not Suitable' %}-{% else %}{{ '%.2f'|format(item.bic) }}{% endif %}</td>
+                      <td>{% if item.rank %}#{{ item.rank }}{% else %}-{% endif %}</td>
+                      <td>{% if item.selected %}<span class="badge text-bg-primary">Yes</span>{% else %}<span class="badge text-bg-light text-dark">No</span>{% endif %}</td>
+                    </tr>
+                  {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <div class="result-box show mt-3">
+                <h3 class="h6"><i class="bi bi-clipboard2-pulse"></i> Analysis Summary</h3>
+                <p class="mb-0">{{ analysis.distribution.analysis_summary }}</p>
+              </div>
+              <h3 class="h5">Engineering Insights</h3>
+              <ul class="insight-list">{% for insight in analysis.insights %}<li>{{ insight }}</li>{% endfor %}</ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="distribution-explanation" class="content-band">
+        <div class="tool-panel explanation-card">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <p class="eyebrow text-primary mb-1">Mathematical Model</p>
+              <h2 class="mb-1"><i class="bi bi-journal-richtext"></i> Distribution Explanation</h2>
+              <p class="text-secondary mb-0">Why this distribution was selected, what model it uses, and how probability is computed.</p>
+            </div>
+            <span class="badge fs-6 {% if analysis.distribution.explanation.distribution_type == 'Discrete Distribution' %}text-bg-info{% else %}text-bg-secondary{% endif %}">
+              {{ analysis.distribution.explanation.detected_dataset_type }}
+            </span>
+          </div>
+
+          <div class="accordion explanation-accordion" id="distributionExplanation">
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#explainType">
+                  <i class="bi bi-diagram-3"></i> Distribution Type
+                </button>
+              </h3>
+              <div id="explainType" class="accordion-collapse collapse show" data-bs-parent="#distributionExplanation">
+                <div class="accordion-body">
+                  <h4 class="h6">Detected Dataset Type</h4>
+                  <span class="badge text-bg-primary mb-2">{{ analysis.distribution.explanation.detected_dataset_type }}</span>
+                  <p class="mb-0">{{ analysis.distribution.explanation.detected_dataset_reason }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#explainBest">
+                  <i class="bi bi-trophy"></i> Best Fitted Distribution
+                </button>
+              </h3>
+              <div id="explainBest" class="accordion-collapse collapse" data-bs-parent="#distributionExplanation">
+                <div class="accordion-body">
+                  <h4 class="h5">{{ analysis.distribution.explanation.best_distribution }}</h4>
+                  <p class="mb-0"><strong>Reason:</strong> {{ analysis.distribution.explanation.selection_reason }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#explainParams">
+                  <i class="bi bi-sliders"></i> Estimated Parameters
+                </button>
+              </h3>
+              <div id="explainParams" class="accordion-collapse collapse" data-bs-parent="#distributionExplanation">
+                <div class="accordion-body parameter-grid">
+                  {% for param in analysis.distribution.explanation.parameters %}
+                    <div><span>\({{ param.symbol }}\)</span><strong>{{ param.value }}</strong></div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#explainFormula">
+                  <i class="bi bi-braces"></i> Formula
+                </button>
+              </h3>
+              <div id="explainFormula" class="accordion-collapse collapse" data-bs-parent="#distributionExplanation">
+                <div class="accordion-body">
+                  <span class="badge text-bg-dark mb-2">{{ analysis.distribution.explanation.formula_title }}</span>
+                  <div class="formula-box">\[{{ analysis.distribution.explanation.formula }}\]</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#explainMoments">
+                  <i class="bi bi-calculator"></i> Mean and Variance
+                </button>
+              </h3>
+              <div id="explainMoments" class="accordion-collapse collapse" data-bs-parent="#distributionExplanation">
+                <div class="accordion-body row g-3">
+                  <div class="col-md-6">
+                    <div class="formula-box h-100">
+                      <h4 class="h6">Mean Formula</h4>
+                      \[{{ analysis.distribution.explanation.mean_formula }}\]
+                      <p class="mb-0"><strong>Estimated:</strong> \({{ analysis.distribution.explanation.mean_estimate }}\)</p>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="formula-box h-100">
+                      <h4 class="h6">Variance Formula</h4>
+                      \[{{ analysis.distribution.explanation.variance_formula }}\]
+                      <p class="mb-0"><strong>Estimated:</strong> \({{ analysis.distribution.explanation.variance_estimate }}\)</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#explainMgf">
+                  <i class="bi bi-infinity"></i> Moment Generating Function
+                </button>
+              </h3>
+              <div id="explainMgf" class="accordion-collapse collapse" data-bs-parent="#distributionExplanation">
+                <div class="accordion-body">
+                  <div class="formula-box">\[{{ analysis.distribution.explanation.mgf }}\]</div>
+                  <p class="mb-0"><strong>With estimated parameters:</strong> \({{ analysis.distribution.explanation.mgf_estimate }}\)</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#explainProbability">
+                  <i class="bi bi-percent"></i> Probability Calculation
+                </button>
+              </h3>
+              <div id="explainProbability" class="accordion-collapse collapse" data-bs-parent="#distributionExplanation">
+                <div class="accordion-body" id="explanationProbabilityBody">
+                  {% if probability %}
+                    <div class="probability-steps">
+                      {% for step in probability.steps %}
+                        <div class="step-row">
+                          <span>{{ step.label }}</span>
+                          <strong>\({{ step.math }}\)</strong>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <p class="mb-0 text-secondary">No probability calculation has been submitted for this analysis yet.</p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#explainInterpretation">
+                  <i class="bi bi-mortarboard"></i> Interpretation
+                </button>
+              </h3>
+              <div id="explainInterpretation" class="accordion-collapse collapse" data-bs-parent="#distributionExplanation">
+                <div class="accordion-body">
+                  <ul class="insight-list mb-0">
+                    {% for line in analysis.distribution.explanation.interpretation %}
+                      <li>{{ line }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="probability" class="content-band">
+        <div class="tool-panel">
+          <h2>Probability Calculator</h2>
+          <form action="{{ url_for('calculate_probability_ajax') }}" method="post" class="row g-3 align-items-end" id="probabilityForm">
+            <div class="col-md-3">
+              <label class="form-label">Operation</label>
+              <select class="form-select" name="operation" id="operationSelect">
+                <option value="lte">P(X <= x)</option>
+                <option value="gte">P(X >= x)</option>
+                <option value="between">P(a < X < b)</option>
+              </select>
+            </div>
+            <div class="col-md-3 single-bound">
+              <label class="form-label">x</label>
+              <input class="form-control" name="x_value" type="number" step="any" value="{{ analysis.statistics.mean }}" required>
+            </div>
+            <div class="col-md-2 between-bound d-none">
+              <label class="form-label">a</label>
+              <input class="form-control" name="a_value" type="number" step="any">
+            </div>
+            <div class="col-md-2 between-bound d-none">
+              <label class="form-label">b</label>
+              <input class="form-control" name="b_value" type="number" step="any">
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-primary w-100" type="submit" id="probabilitySubmit">
+                <span class="spinner-border spinner-border-sm me-2 d-none" id="probabilitySpinner" aria-hidden="true"></span>
+                <i class="bi bi-calculator"></i> <span class="submit-label">Calculate</span>
+              </button>
+            </div>
+          </form>
+          <div class="alert alert-danger mt-3 d-none" id="probabilityError"></div>
+          <div class="result-box mt-4 {% if probability %}show{% else %}d-none{% endif %}" id="probabilityResult">
+            <strong id="probabilityFormula">{% if probability %}\({{ probability.result_math }}\){% endif %}</strong>
+            <p class="mb-0" id="probabilityInterpretation">{% if probability %}{{ probability.interpretation }}{% endif %}</p>
+            <div class="probability-steps mt-3" id="probabilityStepsWrap">
+              <h3 class="h6"><i class="bi bi-list-ol"></i> Calculation Steps</h3>
+              <div id="probabilitySteps">
+              {% for step in probability.steps %}
+                <div class="step-row">
+                  <span>{{ step.label }}</span>
+                  <strong>\({{ step.math }}\)</strong>
+                </div>
+              {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="visuals" class="content-band">
+        <h2>Visualizations</h2>
+        <ul class="nav nav-pills mb-3" id="chartTabs" role="tablist">
+          {% for key in analysis.charts.keys() %}
+          <li class="nav-item" role="presentation"><button class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="pill" data-bs-target="#chart-{{ key }}" type="button">{{ key.title() }}</button></li>
+          {% endfor %}
+        </ul>
+        <div class="tab-content">
+          {% for key, chart in analysis.charts.items() %}
+          <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="chart-{{ key }}">
+            <div class="chart-panel">{{ chart|safe }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section id="report" class="content-band">
+        <div class="tool-panel d-flex flex-wrap gap-3 justify-content-between align-items-center">
+          <div>
+            <h2 class="mb-1">Report and Export</h2>
+            <p class="mb-0 text-secondary">Download PDF report or export the statistics table to Excel.</p>
+          </div>
+          <div class="d-flex gap-2">
+            <a class="btn btn-outline-primary" href="{{ url_for('export_statistics') }}"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+            <a class="btn btn-danger" href="{{ url_for('report') }}"><i class="bi bi-file-earmark-pdf"></i> PDF Report</a>
+          </div>
+        </div>
+      </section>
+      {% endif %}
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
