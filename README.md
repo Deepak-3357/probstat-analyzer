@@ -654,7 +654,7 @@ The analyzer does not directly receive the original distribution information. It
 
 ## Module 1 — Normal & Geometric Distribution Analysis
 
-**Member:** Deepak
+**Member:** Deepak R
 
 Responsibilities:
 
@@ -667,7 +667,7 @@ Responsibilities:
 
 ## Module 2 — Uniform & Poisson Distribution Analysis
 
-**Member:** Tamil
+**Member:** Tamilarasan
 
 Responsibilities:
 
@@ -680,7 +680,7 @@ Responsibilities:
 
 ## Module 3 — Exponential & Binomial Distribution Analysis
 
-**Member:** Ibram
+**Member:** Ayman Ibrahim
 
 Responsibilities:
 
