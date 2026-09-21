@@ -1,0 +1,8 @@
+Flask
+pandas
+numpy
+scipy
+plotly
+matplotlib
+reportlab
+openpyxl
